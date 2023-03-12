@@ -12,9 +12,6 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
   final GoogleSignIn googleSignIn;
 
   AuthBloc({required this.googleSignIn}) : super(AuthInitial()) {
-    on<AuthEvent>((event, emit) {
-      print("saurabh keskar");
-    });
     on<GoogleSignInEvent>((event, emit) async {
       try {
         final googleAccount = await googleSignIn.signIn();
@@ -27,6 +24,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
           final accessToken =
               authHeaders['Authorization']?.split(' ')?.last ?? '';
           PreferencesHelper.setString(Preferences.accessToken, accessToken);
+          PreferencesHelper.setBoolean(Preferences.isLoggedIn, true);
           emit(GoogleSignInSuccess());
         }else{
           emit(GoogleSignInErrorState());
@@ -38,7 +36,9 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     });
 
     on<GoogleSignOutEvent>((event, emit) {
+      print("signOut called");
       googleSignIn.signOut();
+      PreferencesHelper.setBoolean(Preferences.isLoggedIn, false);
       emit(GoogleSignOutSuccess());
     });
 

@@ -2,6 +2,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:carousel_slider/carousel_slider.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:googleapis_auth/auth_io.dart' as auth;
 import 'package:googleapis/drive/v3.dart' as drive;
@@ -22,9 +23,19 @@ class _MyHomePageState extends State<MyHomePage> {
   @override
   void initState() {
     _handleSignIn();
+    SystemChrome.setPreferredOrientations([
+      // DeviceOrientation.portraitUp,
+      // DeviceOrientation.landscapeRight,
+      DeviceOrientation.landscapeLeft
+    ]);
     super.initState();
   }
 
+  @override
+  void dispose() {
+    SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
+    super.dispose();
+  }
   List<String> idList = [];
 
   Future<void> _handleSignIn() async {
@@ -34,7 +45,7 @@ class _MyHomePageState extends State<MyHomePage> {
           'Bearer',
           PreferencesHelper.getString(Preferences.accessToken) ?? '',
           DateTime.now()
-              .add(const Duration(hours: 1))
+              .add(const Duration(days: 30))
               .toUtc(), // Set the expiration time to 1 hour from now
         ),
         null,
@@ -46,11 +57,14 @@ class _MyHomePageState extends State<MyHomePage> {
       );
 
       final driveApi = drive.DriveApi(authClient);
+      print(driveApi.files.list());
       drive.FileList files = await driveApi.files
-          .list(q: "mimeType='image/jpeg' or mimeType='image/png'");
+          .list(q: "mimeType='image/jpeg' or mimeType='image/png' or mimeType='image/JPG' or mimeType='image/jpg'");
 
       if (files.files != null) {
         idList = files.files!.map((file) {
+          print(file.name);
+          print('https://drive.google.com/thumbnail?id=${file.id}');
           return file.id.toString();
         }).toList();
       } else {
@@ -79,62 +93,71 @@ class _MyHomePageState extends State<MyHomePage> {
           );
         }
       },
-      child: Scaffold(
-        appBar: AppBar(
-          leading: IconButton(
-            onPressed: () {
-              context.read<AuthBloc>().add(GoogleSignOutEvent());
-            },
-            icon: Icon(
-              Icons.logout,
-              color: Colors.black,
-            ),
-          ),
-          backgroundColor: Colors.transparent,
-          elevation: 0,
-        ),
-        body: idList.isEmpty
-            ? Center(child: CircularProgressIndicator())
-            : CarouselSlider.builder(
-                itemCount: idList.length,
-                itemBuilder:
-                    (BuildContext context, int itemIndex, int pageViewIndex) {
-                  final imageId = idList[itemIndex];
-                  return CachedNetworkImage(
-                    imageUrl:
-                        "https://drive.google.com/thumbnail?id=${imageId}",
-                    imageBuilder: (context, imageProvider) => Container(
-                      height: MediaQuery.of(context).size.height * 0.8,
-                      padding: EdgeInsets.symmetric(vertical: 20),
-                      decoration: BoxDecoration(
-                        image: DecorationImage(
-                          image: imageProvider,
-                          fit: BoxFit.fill,
+      child: SafeArea(
+        child: Scaffold(
+          body: Stack(
+            children: [
+              idList.isEmpty
+                  ? Center(child: CircularProgressIndicator())
+                  : Center(
+                    child: CarouselSlider.builder(
+                        itemCount: idList.length,
+                        itemBuilder: (BuildContext context, int itemIndex,
+                            int pageViewIndex) {
+                          final imageId = idList[itemIndex];
+                          print('https://drive.google.com/thumbnail?id=${imageId}');
+                          return CachedNetworkImage(
+                            imageUrl:
+                                "https://drive.google.com/thumbnail?id=${imageId}",
+                            imageBuilder: (context, imageProvider) => Container(
+                              height: MediaQuery.of(context).size.height * 0.8,
+                              padding: EdgeInsets.symmetric(vertical: 20),
+                              decoration: BoxDecoration(
+                                image: DecorationImage(
+                                  image: imageProvider,
+                                  fit: BoxFit.fill,
+                                ),
+                              ),
+                            ),
+                            placeholder: (context, url) =>
+                                Center(child: CircularProgressIndicator()),
+                            errorWidget: (context, url, error) => Icon(Icons.error),
+                          );
+                        },
+                        options: CarouselOptions(
+                          height: MediaQuery.of(context).size.height * 0.8,
+                          // aspectRatio: 16 / 50,
+                          // viewportFraction: 0.8,
+                          initialPage: 0,
+                          enableInfiniteScroll: true,
+                          reverse: false,
+                          autoPlay: true,
+                          autoPlayInterval: Duration(seconds: 3),
+                          autoPlayAnimationDuration: Duration(milliseconds: 800),
+                          autoPlayCurve: Curves.fastOutSlowIn,
+                          enlargeCenterPage: true,
+                          enlargeFactor: 0.3,
+                          // onPageChanged: callbackFunction,
+                          scrollDirection: Axis.horizontal,
                         ),
                       ),
-                    ),
-                    placeholder: (context, url) =>
-                        Center(child: CircularProgressIndicator()),
-                    errorWidget: (context, url, error) => Icon(Icons.error),
-                  );
-                },
-                options: CarouselOptions(
-                  height: MediaQuery.of(context).size.height * 0.8,
-                  // aspectRatio: 16 / 50,
-                  // viewportFraction: 0.8,
-                  initialPage: 0,
-                  enableInfiniteScroll: true,
-                  reverse: false,
-                  autoPlay: true,
-                  autoPlayInterval: Duration(seconds: 3),
-                  autoPlayAnimationDuration: Duration(milliseconds: 800),
-                  autoPlayCurve: Curves.fastOutSlowIn,
-                  enlargeCenterPage: true,
-                  enlargeFactor: 0.3,
-                  // onPageChanged: callbackFunction,
-                  scrollDirection: Axis.horizontal,
+                  ),
+
+              Align(
+                alignment: Alignment.topLeft,
+                child: IconButton(
+                  onPressed: () {
+                    context.read<AuthBloc>().add(GoogleSignOutEvent());
+                  },
+                  icon: Icon(
+                    Icons.logout,
+                    color: Colors.black,
+                  ),
                 ),
               ),
+            ],
+          ),
+        ),
       ),
     );
   }
